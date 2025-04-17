@@ -35,7 +35,6 @@ if option == "Manual Stock Analysis":
                         st.write(f"**SMA 5:** {sma_5:.2f}")
                         st.write(f"**SMA 20:** {sma_20:.2f}")
 
-                        # Trading logic based on SMA comparison
                         if sma_5 > sma_20:
                             st.success("📈 BUY Signal - Short-term uptrend.")
                         elif sma_5 < sma_20:
@@ -51,7 +50,6 @@ elif option == "Auto Screener 🔍":
         "RELIANCE.NS", "TCS.NS", "INFY.NS", "HDFCBANK.NS", "ICICIBANK.NS",
         "LT.NS", "SBIN.NS", "AXISBANK.NS", "BHARTIARTL.NS", "ITC.NS",
         "TATAMOTORS.NS", "WIPRO.NS"
-        # Add more if you want Bava 💖
     ]
 
     def analyze_stock(symbol):
@@ -59,19 +57,27 @@ elif option == "Auto Screener 🔍":
             df = yf.download(symbol, period="1mo", interval="1d")
             if df.empty:
                 return "❌ No Data"
+
             df['SMA_5'] = df['Close'].rolling(window=5).mean()
             df['SMA_20'] = df['Close'].rolling(window=20).mean()
             df.dropna(inplace=True)
 
+            if len(df) == 0:
+                return "⚠️ Not enough data"
+
             latest = df.iloc[-1]
-            if latest['SMA_5'] > latest['SMA_20']:
+            sma_5 = float(latest['SMA_5'])
+            sma_20 = float(latest['SMA_20'])
+
+            if sma_5 > sma_20:
                 return "📈 BUY"
-            elif latest['SMA_5'] < latest['SMA_20']:
+            elif sma_5 < sma_20:
                 return "📉 SELL"
             else:
                 return "⚖️ HOLD"
+
         except Exception as e:
-            return f"⚠️ Error with {symbol}: {e}"
+            return f"⚠️ Error with {symbol}: {str(e)}"
 
     if st.button("🚀 Run Screener for NIFTY Stocks"):
         results = {}
@@ -79,7 +85,7 @@ elif option == "Auto Screener 🔍":
             for symbol in nifty_50_stocks:
                 signal = analyze_stock(symbol)
                 results[symbol] = signal
-                st.write(f"**{symbol}** → {signal}")  # Display each result as it's processed
+                st.write(f"**{symbol}** → {signal}")
 
         st.subheader("🔍 Screener Results:")
         for stock, signal in results.items():
