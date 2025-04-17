@@ -3,38 +3,43 @@ import yfinance as yf
 import pandas as pd
 import ta
 
-# App title
-st.set_page_config(page_title="SweetTrade - Manual Stock Analysis", layout="wide")
+# App Config
+st.set_page_config(page_title="SweetTrade - Manual Stock Analyzer", layout="wide")
 st.title("🍬 SweetTrade Manual Stock Analyzer")
 
-# Input
+# Input box
 ticker = st.text_input("Enter Stock Symbol (e.g., RELIANCE.NS):", value="RELIANCE.NS")
 
 if ticker:
     try:
-        # Fetch data
+        # Fetching data
         df = yf.download(ticker, period="3mo", interval="1d")
 
         if df.empty:
             st.error("No data found. Please check the stock symbol.")
-        elif df.shape[0] < 20:
+        elif len(df) < 20:
             st.warning("Not enough data to calculate indicators (minimum 20 rows required).")
         else:
-            # Calculate Indicators
-            df['RSI'] = ta.momentum.RSIIndicator(close=df['Close'], window=14).rsi()
-            df['SMA20'] = df['Close'].rolling(window=20).mean()
-            df['SMA50'] = df['Close'].rolling(window=50).mean()
+            # Fix: make sure we use the proper 1D Series
+            close_series = df['Close']
 
-            # Display Table
+            # Technical Indicators
+            rsi = ta.momentum.RSIIndicator(close=close_series, window=14)
+            df['RSI'] = rsi.rsi()
+
+            df['SMA20'] = close_series.rolling(window=20).mean()
+            df['SMA50'] = close_series.rolling(window=50).mean()
+
+            # Show Table
             st.subheader("📊 Stock Data with Indicators")
             st.dataframe(df[['Close', 'RSI', 'SMA20', 'SMA50']].dropna().tail(30))
 
-            # Plot Chart
+            # Charts
             st.subheader("📈 Price Chart with Moving Averages")
-            st.line_chart(df[['Close', 'SMA20', 'SMA50']])
+            st.line_chart(df[['Close', 'SMA20', 'SMA50']].dropna())
 
-            # Show RSI
             st.subheader("📉 RSI Trend")
             st.line_chart(df[['RSI']].dropna())
+
     except Exception as e:
         st.error(f"An error occurred: {str(e)}")
