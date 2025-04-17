@@ -2,48 +2,81 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 
-# Title of the app
-st.title("SweetTrade: Bava's Advanced Trading Tool")
+st.set_page_config(page_title="SweetTrade", layout="centered")
+st.title("💖 SweetTrade: Bava's Advanced Trading Tool")
 
-# Input for stock symbol
-symbol = st.text_input("Enter Stock Symbol (e.g., TATAMOTORS.NS)", "BPCL.NS")
+# Sidebar Navigation
+option = st.sidebar.radio("📌 Choose Option:", ["Manual Stock Analysis", "Auto Screener 🔍"])
 
-# If a symbol is entered, fetch and display data
-if symbol:
-    with st.spinner("📊 Fetching stock data..."):
-        stock_data = yf.download(symbol, period="1mo", interval="1d")
+# ----------- Manual Analysis Logic -----------
+if option == "Manual Stock Analysis":
+    symbol = st.text_input("Enter Stock Symbol (e.g., TATAMOTORS.NS)", "BPCL.NS")
 
-        # If data is empty, show an error
-        if stock_data.empty:
-            st.error("⚠️ No data found for the given symbol.")
-        else:
-            # Calculating Simple Moving Averages (SMA)
-            stock_data['SMA_5'] = stock_data['Close'].rolling(window=5).mean()
-            stock_data['SMA_20'] = stock_data['Close'].rolling(window=20).mean()
-            stock_data.dropna(inplace=True)
+    if symbol:
+        with st.spinner("📊 Fetching stock data..."):
+            stock_data = yf.download(symbol, period="1mo", interval="1d")
 
-            if len(stock_data) < 1:
-                st.error("⚠️ Not enough data to calculate SMAs.")
+            if stock_data.empty:
+                st.error("⚠️ No data found for the given symbol.")
             else:
-                latest_row = stock_data.iloc[-1]
+                stock_data['SMA_5'] = stock_data['Close'].rolling(window=5).mean()
+                stock_data['SMA_20'] = stock_data['Close'].rolling(window=20).mean()
+                stock_data.dropna(inplace=True)
 
-                # Convert SMAs to float using .item()
-                try:
-                    sma_5_latest = latest_row['SMA_5'].item() if hasattr(latest_row['SMA_5'], 'item') else float(latest_row['SMA_5'])
-                    sma_20_latest = latest_row['SMA_20'].item() if hasattr(latest_row['SMA_20'], 'item') else float(latest_row['SMA_20'])
+                if len(stock_data) < 1:
+                    st.error("⚠️ Not enough data to calculate SMAs.")
+                else:
+                    latest_row = stock_data.iloc[-1]
+                    try:
+                        sma_5 = latest_row['SMA_5']
+                        sma_20 = latest_row['SMA_20']
+                        
+                        st.subheader("📅 Latest Analysis")
+                        st.write(f"**SMA 5:** {sma_5:.2f}")
+                        st.write(f"**SMA 20:** {sma_20:.2f}")
 
-                    # Displaying results
-                    st.write(f"📅 Latest Stock Data")
-                    st.write(f"📈 Price & Moving Averages")
-                    st.write(f"SMA_5: {sma_5_latest}")
-                    st.write(f"SMA_20: {sma_20_latest}")
+                        if sma_5 > sma_20:
+                            st.success("📈 BUY Signal - Short-term uptrend.")
+                        elif sma_5 < sma_20:
+                            st.error("📉 SELL Signal - Short-term downtrend.")
+                        else:
+                            st.warning("⚖️ HOLD - No clear direction.")
+                    except Exception as e:
+                        st.error(f"⚠️ Error comparing SMAs: {e}")
 
-                    # Trading signal logic
-                    if sma_5_latest > sma_20_latest:
-                        st.success("📈 BUY Signal - Short-term uptrend detected.")
-                    elif sma_5_latest < sma_20_latest:
-                        st.error("📉 SELL Signal - Short-term downtrend detected.")
-                    else:
-                        st.warning("⚖️ HOLD - No clear trend.")
-                except Exception as e:
-                    st.error(f"⚠️ Unable to compare SMA values. Error: {e}")
+# ----------- Auto Screener Logic -----------
+elif option == "Auto Screener 🔍":
+    nifty_50_stocks = [
+        "RELIANCE.NS", "TCS.NS", "INFY.NS", "HDFCBANK.NS", "ICICIBANK.NS",
+        "LT.NS", "SBIN.NS", "AXISBANK.NS", "BHARTIARTL.NS", "ITC.NS",
+        "TATAMOTORS.NS", "WIPRO.NS"
+        # Add more if you want Bava 💖
+    ]
+
+    def analyze_stock(symbol):
+        df = yf.download(symbol, period="1mo", interval="1d")
+        df['SMA_5'] = df['Close'].rolling(window=5).mean()
+        df['SMA_20'] = df['Close'].rolling(window=20).mean()
+        df.dropna(inplace=True)
+
+        if df.empty:
+            return "❌ No Data"
+        
+        latest = df.iloc[-1]
+        if latest['SMA_5'] > latest['SMA_20']:
+            return "📈 BUY"
+        elif latest['SMA_5'] < latest['SMA_20']:
+            return "📉 SELL"
+        else:
+            return "⚖️ HOLD"
+
+    if st.button("🚀 Run Screener for NIFTY Stocks"):
+        results = {}
+        with st.spinner("Scanning NIFTY 50 stocks..."):
+            for symbol in nifty_50_stocks:
+                signal = analyze_stock(symbol)
+                results[symbol] = signal
+
+        st.subheader("🔍 Screener Results:")
+        for stock, signal in results.items():
+            st.write(f"**{stock}** → {signal}")
