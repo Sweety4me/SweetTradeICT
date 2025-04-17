@@ -1,69 +1,40 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
-import datetime
 import ta
 
-st.set_page_config(page_title="SweetTradeICT", layout="wide")
+# App title
+st.set_page_config(page_title="SweetTrade - Manual Stock Analysis", layout="wide")
+st.title("🍬 SweetTrade Manual Stock Analyzer")
 
-st.sidebar.title("🎬 Movie AI TOOLS")
-st.sidebar.markdown("## Choose Option:")
-option = st.sidebar.radio("📌 Choose Option:", ("Manual Stock Analysis", "Auto Screener 🔍"))
+# Input
+ticker = st.text_input("Enter Stock Symbol (e.g., RELIANCE.NS):", value="RELIANCE.NS")
 
-st.markdown("<h1 style='color:#1954ed;'>💖⚡ SweetTrade: Bava's Advanced Trading Tool</h1>", unsafe_allow_html=True)
+if ticker:
+    try:
+        # Fetch data
+        df = yf.download(ticker, period="3mo", interval="1d")
 
-nifty_stocks = [
-    'RELIANCE.NS', 'TCS.NS', 'INFY.NS', 'HDFCBANK.NS', 'ICICIBANK.NS', 'LT.NS',
-    'SBIN.NS', 'AXISBANK.NS', 'BHARTIARTL.NS', 'ITC.NS', 'TATAMOTORS.NS', 'WIPRO.NS'
-]
+        if df.empty:
+            st.error("No data found. Please check the stock symbol.")
+        elif df.shape[0] < 20:
+            st.warning("Not enough data to calculate indicators (minimum 20 rows required).")
+        else:
+            # Calculate Indicators
+            df['RSI'] = ta.momentum.RSIIndicator(close=df['Close'], window=14).rsi()
+            df['SMA20'] = df['Close'].rolling(window=20).mean()
+            df['SMA50'] = df['Close'].rolling(window=50).mean()
 
-def calculate_indicators(stock):
-    df = yf.download(stock, period="6mo", interval="1d", progress=False)
-    df.dropna(inplace=True)
+            # Display Table
+            st.subheader("📊 Stock Data with Indicators")
+            st.dataframe(df[['Close', 'RSI', 'SMA20', 'SMA50']].dropna().tail(30))
 
-    # Technical Indicators
-    df['RSI'] = ta.momentum.RSIIndicator(close=df['Close'], window=14).rsi()
-    macd = ta.trend.MACD(close=df['Close'])
-    df['MACD'] = macd.macd()
-    df['Signal'] = macd.macd_signal()
-    df['EMA200'] = ta.trend.EMAIndicator(close=df['Close'], window=200).ema_indicator()
+            # Plot Chart
+            st.subheader("📈 Price Chart with Moving Averages")
+            st.line_chart(df[['Close', 'SMA20', 'SMA50']])
 
-    latest = df.iloc[-1]
-    signal = ""
-    reason = []
-
-    # Buy/Sell Logic
-    if latest['RSI'] < 40:
-        reason.append(f"RSI: {latest['RSI']:.0f}")
-    elif latest['RSI'] > 70:
-        reason.append(f"Overbought (RSI: {latest['RSI']:.0f})")
-
-    if latest['MACD'] > latest['Signal']:
-        reason.append("MACD: Bullish")
-    else:
-        reason.append("MACD: Bearish")
-
-    if latest['Close'] > latest['EMA200']:
-        reason.append("Above EMA200")
-    else:
-        reason.append("Below EMA200")
-
-    if latest['RSI'] < 40 and latest['MACD'] > latest['Signal'] and latest['Close'] > latest['EMA200']:
-        signal = "📈 BUY"
-    elif latest['RSI'] > 70 and latest['MACD'] < latest['Signal'] and latest['Close'] < latest['EMA200']:
-        signal = "📉 SELL"
-    else:
-        signal = "⚠️ HOLD"
-
-    return signal, ", ".join(reason)
-
-if option == "Auto Screener 🔍":
-    if st.button("🚀 Run Screener for NIFTY Stocks"):
-        results = []
-        for stock in nifty_stocks:
-            signal, reason = calculate_indicators(stock)
-            results.append((stock, signal, reason))
-
-        st.subheader("🔍 Screener Results:")
-        for stock, signal, reason in results:
-            st.markdown(f"**{stock}** → {signal} ({reason})")
+            # Show RSI
+            st.subheader("📉 RSI Trend")
+            st.line_chart(df[['RSI']].dropna())
+    except Exception as e:
+        st.error(f"An error occurred: {str(e)}")
