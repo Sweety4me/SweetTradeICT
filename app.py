@@ -1,92 +1,69 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
+import datetime
+import ta
 
-st.set_page_config(page_title="SweetTrade", layout="centered")
-st.title("💖 SweetTrade: Bava's Advanced Trading Tool")
+st.set_page_config(page_title="SweetTradeICT", layout="wide")
 
-# Sidebar Navigation
-option = st.sidebar.radio("📌 Choose Option:", ["Manual Stock Analysis", "Auto Screener 🔍"])
+st.sidebar.title("🎬 Movie AI TOOLS")
+st.sidebar.markdown("## Choose Option:")
+option = st.sidebar.radio("📌 Choose Option:", ("Manual Stock Analysis", "Auto Screener 🔍"))
 
-# ----------- Manual Analysis Logic -----------
-if option == "Manual Stock Analysis":
-    symbol = st.text_input("Enter Stock Symbol (e.g., TATAMOTORS.NS)", "BPCL.NS")
+st.markdown("<h1 style='color:#1954ed;'>💖⚡ SweetTrade: Bava's Advanced Trading Tool</h1>", unsafe_allow_html=True)
 
-    if symbol:
-        with st.spinner("📊 Fetching stock data..."):
-            stock_data = yf.download(symbol, period="1mo", interval="1d")
+nifty_stocks = [
+    'RELIANCE.NS', 'TCS.NS', 'INFY.NS', 'HDFCBANK.NS', 'ICICIBANK.NS', 'LT.NS',
+    'SBIN.NS', 'AXISBANK.NS', 'BHARTIARTL.NS', 'ITC.NS', 'TATAMOTORS.NS', 'WIPRO.NS'
+]
 
-            if stock_data.empty:
-                st.error("⚠️ No data found for the given symbol.")
-            else:
-                stock_data['SMA_5'] = stock_data['Close'].rolling(window=5).mean()
-                stock_data['SMA_20'] = stock_data['Close'].rolling(window=20).mean()
-                stock_data.dropna(inplace=True)
+def calculate_indicators(stock):
+    df = yf.download(stock, period="6mo", interval="1d", progress=False)
+    df.dropna(inplace=True)
 
-                if len(stock_data) < 1:
-                    st.error("⚠️ Not enough data to calculate SMAs.")
-                else:
-                    latest_row = stock_data.iloc[-1]
-                    try:
-                        sma_5 = float(latest_row['SMA_5'])
-                        sma_20 = float(latest_row['SMA_20'])
+    # Technical Indicators
+    df['RSI'] = ta.momentum.RSIIndicator(close=df['Close'], window=14).rsi()
+    macd = ta.trend.MACD(close=df['Close'])
+    df['MACD'] = macd.macd()
+    df['Signal'] = macd.macd_signal()
+    df['EMA200'] = ta.trend.EMAIndicator(close=df['Close'], window=200).ema_indicator()
 
-                        st.subheader("📅 Latest Analysis")
-                        st.write(f"**SMA 5:** {sma_5:.2f}")
-                        st.write(f"**SMA 20:** {sma_20:.2f}")
+    latest = df.iloc[-1]
+    signal = ""
+    reason = []
 
-                        if sma_5 > sma_20:
-                            st.success("📈 BUY Signal - Short-term uptrend.")
-                        elif sma_5 < sma_20:
-                            st.error("📉 SELL Signal - Short-term downtrend.")
-                        else:
-                            st.warning("⚖️ HOLD - No clear direction.")
-                    except Exception as e:
-                        st.error(f"⚠️ Error comparing SMAs: {e}")
+    # Buy/Sell Logic
+    if latest['RSI'] < 40:
+        reason.append(f"RSI: {latest['RSI']:.0f}")
+    elif latest['RSI'] > 70:
+        reason.append(f"Overbought (RSI: {latest['RSI']:.0f})")
 
-# ----------- Auto Screener Logic -----------
-elif option == "Auto Screener 🔍":
-    nifty_50_stocks = [
-        "RELIANCE.NS", "TCS.NS", "INFY.NS", "HDFCBANK.NS", "ICICIBANK.NS",
-        "LT.NS", "SBIN.NS", "AXISBANK.NS", "BHARTIARTL.NS", "ITC.NS",
-        "TATAMOTORS.NS", "WIPRO.NS"
-    ]
+    if latest['MACD'] > latest['Signal']:
+        reason.append("MACD: Bullish")
+    else:
+        reason.append("MACD: Bearish")
 
-    def analyze_stock(symbol):
-        try:
-            df = yf.download(symbol, period="1mo", interval="1d")
-            if df.empty:
-                return "❌ No Data"
+    if latest['Close'] > latest['EMA200']:
+        reason.append("Above EMA200")
+    else:
+        reason.append("Below EMA200")
 
-            df['SMA_5'] = df['Close'].rolling(window=5).mean()
-            df['SMA_20'] = df['Close'].rolling(window=20).mean()
-            df.dropna(inplace=True)
+    if latest['RSI'] < 40 and latest['MACD'] > latest['Signal'] and latest['Close'] > latest['EMA200']:
+        signal = "📈 BUY"
+    elif latest['RSI'] > 70 and latest['MACD'] < latest['Signal'] and latest['Close'] < latest['EMA200']:
+        signal = "📉 SELL"
+    else:
+        signal = "⚠️ HOLD"
 
-            if len(df) == 0:
-                return "⚠️ Not enough data"
+    return signal, ", ".join(reason)
 
-            latest = df.iloc[-1]
-            sma_5 = float(latest['SMA_5'])
-            sma_20 = float(latest['SMA_20'])
-
-            if sma_5 > sma_20:
-                return "📈 BUY"
-            elif sma_5 < sma_20:
-                return "📉 SELL"
-            else:
-                return "⚖️ HOLD"
-
-        except Exception as e:
-            return f"⚠️ Error with {symbol}: {str(e)}"
-
+if option == "Auto Screener 🔍":
     if st.button("🚀 Run Screener for NIFTY Stocks"):
-        results = {}
-        with st.spinner("Scanning NIFTY 50 stocks..."):
-            for symbol in nifty_50_stocks:
-                signal = analyze_stock(symbol)
-                results[symbol] = signal
-                st.write(f"**{symbol}** → {signal}")
+        results = []
+        for stock in nifty_stocks:
+            signal, reason = calculate_indicators(stock)
+            results.append((stock, signal, reason))
 
         st.subheader("🔍 Screener Results:")
-        for stock, signal in results.items():
-            st.write(f"**{stock}** → {signal}")
+        for stock, signal, reason in results:
+            st.markdown(f"**{stock}** → {signal} ({reason})")
