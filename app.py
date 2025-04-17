@@ -28,12 +28,13 @@ if option == "Manual Stock Analysis":
                 else:
                     latest_row = stock_data.iloc[-1]
                     try:
-                        sma_5 = latest_row['SMA_5']
-                        sma_20 = latest_row['SMA_20']
-                        
-                        st.subheader("📅 Latest Analysis")
-                        st.write(f"**SMA 5:** {sma_5:.2f}")
-                        st.write(f"**SMA 20:** {sma_20:.2f}")
+                        sma_5 = float(latest_row['SMA_5'])
+                        sma_20 = float(latest_row['SMA_20'])
+
+                          st.subheader("📅 Latest Analysis")
+                          st.write(f"**SMA 5:** {sma_5:.2f}")
+                          st.write(f"**SMA 20:** {sma_20:.2f}")
+
 
                         if sma_5 > sma_20:
                             st.success("📈 BUY Signal - Short-term uptrend.")
