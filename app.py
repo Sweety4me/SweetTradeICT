@@ -1,51 +1,38 @@
-import streamlit as st
 import yfinance as yf
 import pandas as pd
 import ta
+import streamlit as st
 
-# — App Config —
-st.set_page_config(page_title="SweetTrade Manual Analyzer", layout="wide")
-st.title("🍬 SweetTrade Manual Stock Analyzer")
+# Example Symbols (You can input any symbol)
+symbol = st.text_input("Enter Stock Symbol (e.g., RELIANCE.NS)", "RELIANCE.NS")
 
-# — Input —
-ticker_input = st.text_input("Enter Stock Symbol (e.g., RELIANCE.NS):", value="RELIANCE.NS")
-ticker = ticker_input.strip().upper()
+# Fetch the data for the last month (15-minute candles)
+df = yf.download(symbol, period="1mo", interval="15m")
 
-if ticker:
-    try:
-        # — Fetch Data —
-        df = yf.download(ticker, period="3mo", interval="1d", progress=False)
+# Calculate Simple Moving Averages (SMA) and Exponential Moving Averages (EMA)
+df['SMA20'] = df['Close'].rolling(window=20).mean()
+df['SMA50'] = df['Close'].rolling(window=50).mean()
+df['EMA10'] = ta.trend.ema_indicator(df['Close'], window=10)
 
-        # — Early exits —
-        if df.empty:
-            st.error("No data found. Check symbol.")
-        elif len(df) < 20:
-            st.warning("Need at least 20 rows of data.")
-        else:
-            # — Flatten any MultiIndex columns down to their first level —
-            if isinstance(df.columns, pd.MultiIndex):
-                df.columns = df.columns.get_level_values(0)
+# Market Structure: Identify Bullish and Bearish Trend
+df['bullish_structure'] = df['Close'] > df['SMA50']  # Bullish if above SMA50
+df['bearish_structure'] = df['Close'] < df['SMA50']  # Bearish if below SMA50
 
-            # — Work with a true 1‑D Series for Close —
-            close = df["Close"].astype(float)
+# Define Buy and Sell Signals Based on Market Structure
+df['buy_signal'] = (df['bullish_structure'] & (df['Close'] > df['SMA20']))
+df['sell_signal'] = (df['bearish_structure'] & (df['Close'] < df['SMA20']))
 
-            # — Calculate Indicators —
-            df["RSI"]   = ta.momentum.RSIIndicator(close=close, window=14).rsi()
-            df["SMA20"] = close.rolling(20).mean()
-            df["SMA50"] = close.rolling(50).mean()
+# Display signals in Streamlit
+st.title(f"SweetTrade: {symbol} - ICT + SMC Strategy Signals")
 
-            # — Table of last 30 rows —
-            st.subheader("📊 Stock Data with Indicators")
-            display_df = df[["Close","RSI","SMA20","SMA50"]].dropna().tail(30)
-            st.dataframe(display_df)
+st.subheader("Buy Signals:")
+st.write(df[df['buy_signal'] == True])
 
-            # — Price + SMAs chart —
-            st.subheader("📈 Price Chart with SMA20 & SMA50")
-            st.line_chart(display_df[["Close","SMA20","SMA50"]])
+st.subheader("Sell Signals:")
+st.write(df[df['sell_signal'] == True])
 
-            # — RSI chart —
-            st.subheader("📉 RSI Indicator")
-            st.line_chart(display_df[["RSI"]])
+# Show price chart with indicators and signals
+st.subheader(f"Price Chart with SMA20, SMA50, and Buy/Sell Signals")
+st.line_chart(df[['Close', 'SMA20', 'SMA50']])
 
-    except Exception as e:
-        st.error(f"An error occurred: {e}")
+# Add More Advanced Concepts Later (Liquidity Pools, Order Block Patterns)
