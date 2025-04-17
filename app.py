@@ -3,43 +3,67 @@ import yfinance as yf
 import pandas as pd
 
 # — App Config —
-st.set_page_config(page_title="SweetTrade Manual Analyzer", layout="wide")
-st.title("🍬 SweetTrade Manual Stock Analyzer")
+st.set_page_config(page_title="SweetTrade ICT+SMC", layout="wide")
+st.title("🍬 SweetTrade ICT+SMC Manual Analyzer")
 
 # — Input —
 ticker_input = st.text_input("Enter Stock Symbol (e.g., RELIANCE.NS):", "RELIANCE.NS")
 ticker = ticker_input.strip().upper()
 
 if ticker:
-    # Fetch 3 months of daily data
     df = yf.download(ticker, period="3mo", interval="1d", progress=False)
-
-    # Handle empty or too‑small data
-    if df.empty:
-        st.error("❌ No data found. Check the symbol.")
-    elif len(df) < 20:
-        st.error("⚠️ Not enough data (need ≥20 rows).")
+    if df.empty or len(df) < 50:
+        st.error("⚠️ Not enough data (need ≥50 daily candles).")
     else:
-        # — Flatten multi‑level columns if they exist —
+        # Flatten MultiIndex
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = df.columns.get_level_values(0)
 
-        # — Ensure Close is a proper 1D Series —
+        # 1D Close Series
         close = df['Close'].astype(float)
 
-        # — Calculate Indicators with pandas only —
-        df['SMA20'] = close.rolling(window=20).mean()
-        df['SMA50'] = close.rolling(window=50).mean()
+        # Indicators
+        df['SMA20'] = close.rolling(20).mean()
+        df['SMA50'] = close.rolling(50).mean()
         df['EMA10'] = close.ewm(span=10, adjust=False).mean()
+        df.dropna(subset=['SMA20','SMA50','EMA10'], inplace=True)
 
-        # — Drop rows that still have NaNs —
-        df = df.dropna(subset=['SMA20','SMA50','EMA10'])
+        # Latest values
+        latest = df.iloc[-1]
+        price = latest['Close']
+        sma20 = latest['SMA20']
+        sma50 = latest['SMA50']
 
-        # — Display last 30 rows of data with indicators —
-        st.subheader("📊 Stock Data with SMA20, SMA50 & EMA10")
-        st.dataframe(df[['Close','SMA20','SMA50','EMA10']].tail(30))
+        # Market Structure
+        bullish = price > sma50
+        bearish = price < sma50
 
-        # — Plot Price + Moving Averages —
-        st.subheader("📈 Price Chart with SMA20, SMA50 & EMA10")
-        st.line_chart(df[['Close','SMA20','SMA50','EMA10']])
+        # Strategy Logic (Order‑Block style)
+        if bullish and price > sma20:
+            entry = price
+            sl    = sma50
+            target = entry + (entry - sl) * 5
+            outcome = "📈 BUY SETUP"
+        elif bearish and price < sma20:
+            entry = price
+            sl    = sma50
+            target = entry - (sl - entry) * 5
+            outcome = "📉 SELL SETUP"
+        else:
+            entry = sl = target = None
+            outcome = "⚖️ NO CLEAR SETUP"
 
+        # Display Data & Indicators
+        st.subheader(f"📊 Latest Data for {ticker}")
+        st.write(df[['Close','SMA20','SMA50','EMA10']].tail(5))
+
+        st.subheader("📈 Charts")
+        st.line_chart(df[['Close','SMA20','SMA50']])
+
+        # Display Strategy Signals
+        st.subheader("🎯 Strategy Signal")
+        st.write(outcome)
+        if entry:
+            st.write(f"• Entry:  {entry:.2f}")
+            st.write(f"• Stop‑Loss:  {sl:.2f}")
+            st.write(f"• Target (1:5 RR):  {target:.2f}")
