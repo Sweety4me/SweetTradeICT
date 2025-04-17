@@ -31,11 +31,11 @@ if option == "Manual Stock Analysis":
                         sma_5 = float(latest_row['SMA_5'])
                         sma_20 = float(latest_row['SMA_20'])
 
-                          st.subheader("📅 Latest Analysis")
-                          st.write(f"**SMA 5:** {sma_5:.2f}")
-                          st.write(f"**SMA 20:** {sma_20:.2f}")
+                        st.subheader("📅 Latest Analysis")
+                        st.write(f"**SMA 5:** {sma_5:.2f}")
+                        st.write(f"**SMA 20:** {sma_20:.2f}")
 
-
+                        # Trading logic based on SMA comparison
                         if sma_5 > sma_20:
                             st.success("📈 BUY Signal - Short-term uptrend.")
                         elif sma_5 < sma_20:
