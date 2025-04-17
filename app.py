@@ -4,7 +4,7 @@ import pandas as pd
 import ta
 
 # — App Config —
-st.set_page_config(page_title="SweetTrade - Manual Analyzer", layout="wide")
+st.set_page_config(page_title="SweetTrade Manual Analyzer", layout="wide")
 st.title("🍬 SweetTrade Manual Stock Analyzer")
 
 # — Input —
@@ -16,43 +16,36 @@ if ticker:
         # — Fetch Data —
         df = yf.download(ticker, period="3mo", interval="1d", progress=False)
 
-        # — Handle empty or too-small data —
+        # — Early exits —
         if df.empty:
-            st.error("No data found. Please check the stock symbol.")
+            st.error("No data found. Check symbol.")
         elif len(df) < 20:
-            st.warning("Not enough data to calculate indicators (need ≥ 20 rows).")
+            st.warning("Need at least 20 rows of data.")
         else:
-            # — Flatten columns if MultiIndex —
+            # — Flatten any MultiIndex columns down to their first level —
             if isinstance(df.columns, pd.MultiIndex):
                 df.columns = df.columns.get_level_values(0)
 
-            # — Ensure we have a 1D Close series —
-            close = df['Close'].astype(float)
+            # — Work with a true 1‑D Series for Close —
+            close = df["Close"].astype(float)
 
             # — Calculate Indicators —
-            df['RSI']   = ta.momentum.RSIIndicator(close=close, window=14).rsi()
-            df['SMA20'] = close.rolling(window=20).mean()
-            df['SMA50'] = close.rolling(window=50).mean()
+            df["RSI"]   = ta.momentum.RSIIndicator(close=close, window=14).rsi()
+            df["SMA20"] = close.rolling(20).mean()
+            df["SMA50"] = close.rolling(50).mean()
 
-            # — Display Table —
+            # — Table of last 30 rows —
             st.subheader("📊 Stock Data with Indicators")
-            st.dataframe(
-                df[['Close', 'RSI', 'SMA20', 'SMA50']]
-                  .dropna()
-                  .tail(30)
-            )
+            display_df = df[["Close","RSI","SMA20","SMA50"]].dropna().tail(30)
+            st.dataframe(display_df)
 
-            # — Price + MAs Chart —
+            # — Price + SMAs chart —
             st.subheader("📈 Price Chart with SMA20 & SMA50")
-            st.line_chart(
-                df[['Close', 'SMA20', 'SMA50']].dropna()
-            )
+            st.line_chart(display_df[["Close","SMA20","SMA50"]])
 
-            # — RSI Chart —
+            # — RSI chart —
             st.subheader("📉 RSI Indicator")
-            st.line_chart(
-                df[['RSI']].dropna()
-            )
+            st.line_chart(display_df[["RSI"]])
 
     except Exception as e:
         st.error(f"An error occurred: {e}")
